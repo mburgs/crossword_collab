@@ -1,10 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -118,17 +119,10 @@ func NewPuzzle(metadata string) puzzle {
 	return p
 }
 
-func getNum(value string) int {
-	num, err := strconv.ParseInt(value, 0, 0)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return int(num)
-}
-
 func HttpLoadPuzzle(puzzle string) (puzzle, error) {
+	/**
+	Loads puzzles from a remote URL - an optional puzzle ID can be passed
+	**/
 	response, err := http.Get("http://www.brainsonly.com/servlets-newsday-crossword/newsdaycrossword?date=" + puzzle)
 	if err != nil {
 		log.Fatal(err)
@@ -139,4 +133,19 @@ func HttpLoadPuzzle(puzzle string) (puzzle, error) {
 		log.Fatal(err)
 	}
 	return NewPuzzle(string(contents)), nil
+}
+
+func apiHandler(c http.ResponseWriter, req *http.Request) {
+
+	puzzle, err := HttpLoadPuzzle(req.FormValue("id"))
+	if err != nil {
+		fmt.Fprintln(c, err)
+	}
+
+	res, err := json.Marshal(puzzle)
+	if err != nil {
+		fmt.Fprintln(c, err)
+	}
+
+	fmt.Fprintln(c, string(res))
 }

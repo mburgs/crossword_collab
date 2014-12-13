@@ -1,60 +1,77 @@
 <html>
 <head>
-<title>Chat Example</title>
-<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+<title>Crossword Collab</title>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/knockout/3.2.0/knockout-min.js"></script>
 <script type="text/javascript">
     $(function() {
  
     var conn;
-    var msg = $("#msg");
-    var log = $("#log");
  
-    function appendLog(msg) {
-        var d = log[0]
-        var doScroll = d.scrollTop == d.scrollHeight - d.clientHeight;
-        msg.appendTo(log)
-        if (doScroll) {
-            d.scrollTop = d.scrollHeight - d.clientHeight;
-        }
-    }
- 
-    $("#form").submit(function() {
+    $(".board .letter").on('keypress focusout', function(e) {
         if (!conn) {
             return false;
         }
-        if (!msg.val()) {
-            return false;
+
+        var val;
+
+        if (e.which ) {
+            val = String.fromCharCode(e.which);
+        } else {
+            val = $(this).val();
         }
-        conn.send(msg.val());
-        msg.val("");
-        return false
+
+        var index = $(this).attr('name');
+        conn.send(index + ':' + val);
+    }).on('keypress', function() {
+        $(this).parents('td').next().find('.letter').focus();
     });
  
     if (window["WebSocket"]) {
         conn = new WebSocket("ws://{{$}}/ws/" + location.href.split('/').pop());
         conn.onclose = function(evt) {
-            appendLog($("<div><b>Connection closed.</b></div>"))
+            console.log("Connection closed.");
         }
         conn.onmessage = function(evt) {
-            appendLog($("<div/>").text(evt.data))
+            var data = evt.data;
+
+            if (data[0] != '@') {
+                data = [data];
+            } else {
+                data = data.substr(1).split(',');
+            }
+
+            for (var i=0; i < data.length; i++) {
+                var parts = data[i].split(':'),
+                    index = parts[0],
+                    val = parts[1];
+
+                $('.letter[name=' + index + ']').val(val);
+            }
+            console.log(data);
         }
     } else {
-        appendLog($("<div><b>Your browser does not support WebSockets.</b></div>"))
+        alert("Your browser does not support WebSockets.");
     }
+
+    function AppModel() {
+        this.puzzle = {}
+    }
+
+    ko.applyBindings(new AppModel());
     });
 </script>
 <style type="text/css">
 html {
-    overflow: hidden;
 }
  
 body {
-    overflow: hidden;
-    padding: 0;
+    padding: 40px;
     margin: 0;
     width: 100%;
     height: 100%;
     background: gray;
+    font-family: Arial, sans-serif;
 }
  
 #log {
@@ -68,29 +85,84 @@ body {
     bottom: 3em;
     overflow: auto;
 }
- 
-#form {
-    padding: 0 0.5em 0 0.5em;
-    margin: 0;
-    position: absolute;
-    bottom: 1em;
-    left: 0px;
-    width: 100%;
-    overflow: hidden;
+
+.board {
+    border-collapse: collapse;
+    float: left;
+    margin-right: 20px;
 }
- 
+.board td {
+    border: 1px solid black;
+    margin: 0;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    position: relative;
+}
+.board .letter {
+    font-size: 25px;
+    width: 40px;
+    height: 40px;
+    text-align: center;
+    font-family: monospace;
+}
+.board .number {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    font-size: 8px;
+}
+.board .block {
+    background: black;
+}
+
+.clues {
+    background: white;
+    float: left;
+    font-size: 14px;
+    margin-right: 10px;
+    padding: 10px 5px;
+    width: 200px;
+}
+.clues div {
+    margin: 4px;
+}
 </style>
 </head>
 <body>
-<!-- <div id="log"></div>
-<form id="form">
-    <input type="submit" value="Send" />
-    <input type="text" id="msg" size="64"/>
-</form> -->
 {{with $puzzle := getPuzzle}}
-    {{range $index , $element := $puzzle.blocks}}
-    hi
-    {{end}}
+<table class="board">
+    <tr>
+    {{$clueNum := 1}}
+        {{range $index , $element := .GetBlocks}}
+
+            {{if and (eq (mod $index $puzzle.Width) 0) (gt $index 0)}}
+            </tr><tr>
+            {{end}}
+
+            {{if .}}
+            <td class="block"></td>
+            {{else}}
+            <td><input class="letter" name="{{$index}}" maxlength="1"><span class="number">{{$clueNum}}</span></td>
+            {{$clueNum := (add $clueNum 1)}}
+            {{end}}
+        {{end}}
+    </tr>
+</table>
+
+<div class="clues">
+<b>Clues Down</b>
+{{range $index , $element := .CluesDown}}
+<div><b>{{add $index 1}}.</b> {{$element}}</div>
+{{end}}
+</div>
+
+<div class="clues">
+<b>Clues Across</b>
+{{range $index , $element := .CluesAcross}}
+<div><b>{{add $index 1}}.</b> {{$element}}</div>
+{{end}}
+</div>
 {{end}}
 </body>
 </html>

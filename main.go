@@ -3,55 +3,59 @@ package main
 import (
 	"flag"
 	"fmt"
-	//	"go/build"
 	"github.com/jmoiron/sqlx"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 )
 
 var (
 	addr      = flag.String("addr", ":8086", "http service address")
 	assets    = flag.String("assets", defaultAssetPath(), "path to assets")
 	homeTempl *template.Template
-	funcMap   template.FuncMap
 	db        *sqlx.DB
 )
 
 func defaultAssetPath() string {
-	return "."
+	return "../src/bitbucket.org/mburgs/crossword_collab"
 }
 
-func mod(a int, b int) int {
-	return a % b
-}
+/** Utils **/
+func getNum(value string) int {
+	num, err := strconv.ParseInt(value, 0, 0)
 
-func add(a int, b int) int {
-	return a + b
+	if err != nil {
+		log.Fatal(err)
+		log.Print("debug")
+		num = 0
+	}
+
+	return int(num)
 }
 
 func homeHandler(c http.ResponseWriter, req *http.Request) {
-	if err := homeTempl.Execute(c, req.Host); err != nil {
+	//todo read on server load and save in memory
+	dat, err := ioutil.ReadFile(filepath.Join(*assets, "test.html"))
+
+	if err != nil {
 		fmt.Fprintln(c, err)
+	} else {
+		fmt.Fprintln(c, string(dat))
 	}
 }
 
 func main() {
 	flag.Parse()
 
-	funcMap = make(template.FuncMap)
-	funcMap["getPuzzle"] = getPuzzle
-	funcMap["mod"] = mod
-	funcMap["add"] = add
-
-	homeTempl = template.Must(
-		template.New("home.html").Funcs(funcMap).ParseFiles(filepath.Join(*assets, "home.html")))
-
 	db = db_init()
 
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/ws/", wsHandler)
+	http.HandleFunc("/api/", apiHandler)
+
 	if err := http.ListenAndServe(*addr, nil); err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}
