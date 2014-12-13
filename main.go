@@ -27,6 +27,10 @@ func mod(a int, b int) int {
 	return a % b
 }
 
+func add(a int, b int) int {
+	return a + b
+}
+
 func homeHandler(c http.ResponseWriter, req *http.Request) {
 	if err := homeTempl.Execute(c, req.Host); err != nil {
 		fmt.Fprintln(c, err)
@@ -39,6 +43,7 @@ func main() {
 	funcMap = make(template.FuncMap)
 	funcMap["getPuzzle"] = getPuzzle
 	funcMap["mod"] = mod
+	funcMap["add"] = add
 
 	homeTempl = template.Must(
 		template.New("home.html").Funcs(funcMap).ParseFiles(filepath.Join(*assets, "home.html")))

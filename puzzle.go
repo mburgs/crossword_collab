@@ -9,42 +9,38 @@ import (
 )
 
 type puzzle struct {
-	Width       int
-	Height      int
-	CluesAcross int
-	CluesDown   int
-	Format      string
-
-	//coords of the blocks
-	blocks []bool
+	Width          int
+	Height         int
+	NumCluesAcross int
+	NumCluesDown   int
+	CluesDown      []string
+	CluesAcross    []string
+	Format         string
 }
 
 func (p *puzzle) GetBlocks() []bool {
-	return p.blocks
+	blocks := []bool{}
+
+	for _, r := range p.Format {
+		if string(r) == "#" {
+			blocks = append(blocks, true)
+		} else {
+			blocks = append(blocks, false)
+		}
+	}
+
+	return blocks
 }
 
 func getPuzzle() *puzzle {
-	return &puzzle{
-		Width:  15,
-		Height: 15,
-		blocks: []bool{
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-			false, false, false, false, false, true, false, false, false, false, true, false, false, false,
-		},
+
+	puzzle, err := HttpLoadPuzzle("")
+
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	return &puzzle
 }
 
 func NewPuzzle(metadata string) puzzle {
@@ -63,9 +59,6 @@ func NewPuzzle(metadata string) puzzle {
 
 	lines := strings.Split(metadata, "\n")
 
-	cluesAcross := []string{}
-	cluesDown := []string{}
-
 	var mode = NO_MODE
 	p.Format = ""
 
@@ -83,11 +76,11 @@ func NewPuzzle(metadata string) puzzle {
 					break
 
 				case CLUES_ACROSS_MODE:
-					cluesAcross = append(cluesAcross, value)
+					p.CluesAcross = append(p.CluesAcross, value)
 					break
 
 				case CLUES_DOWN_MODE:
-					cluesDown = append(cluesDown, value)
+					p.CluesDown = append(p.CluesDown, value)
 					break
 
 				}
@@ -109,11 +102,11 @@ func NewPuzzle(metadata string) puzzle {
 			break
 
 		case CLUES_ACROSS:
-			p.CluesAcross = getNum(value)
+			p.NumCluesAcross = getNum(value)
 			break
 
 		case CLUES_DOWN:
-			p.CluesDown = getNum(value)
+			p.NumCluesDown = getNum(value)
 			break
 
 		case START_PUZZLE:
