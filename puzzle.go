@@ -49,7 +49,7 @@ func NewPuzzle(metadata string) puzzle {
 	const HEIGHT = 10
 	const CLUES_ACROSS = 12
 	const CLUES_DOWN = 14
-	const START_PUZZLE = 16
+	const START_PUZZLE = 15
 
 	const NO_MODE = 0
 	const FORMAT_MODE = 1

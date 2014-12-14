@@ -1,0 +1,264 @@
+<html>
+<head>
+<title>Crossword Collab</title>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/knockout/3.2.0/knockout-debug.js"></script>
+
+<style type="text/css">
+html {
+}
+ 
+body {
+    padding: 40px;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: gray;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+}
+
+.board {
+    border-collapse: collapse;
+    float: left;
+    margin-right: 20px;
+}
+.board td {
+    border: 1px solid black;
+    margin: 0;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    position: relative;
+}
+.board .letter {
+    font-size: 25px;
+    width: 40px;
+    height: 40px;
+    text-align: center;
+    font-family: monospace;
+}
+.board .letter:focus {
+    border-color: blue;
+    background-color: #ddd;
+}
+.board .number {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    font-size: 9px;
+    font-weight: bold;
+}
+.board .block {
+    background: black;
+}
+
+.clues {
+    background: white;
+    float: left;
+    font-size: 14px;
+    margin-right: 10px;
+    padding: 10px 5px;
+    width: 200px;
+}
+
+.clues>div {
+    max-height: 90%;
+    overflow-y: scroll;
+}
+.clues>div>div {
+    margin: 4px;
+}
+</style>
+</head>
+<body>
+
+<table class="board">
+    <tbody data-bind="foreach: FormatArray">
+
+        <tr data-bind="foreach: $data">
+            <td data-bind="css: { block: $data == TYPE_BLOCK }, if: $data != TYPE_BLOCK">
+                <input class="letter" name="null" maxlength="1"/><span class="number" data-bind="visible: $data, text: $data"></span>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="clues">
+    <b>Clues Down</b>
+    <div data-bind="foreach: CluesDown()">
+        <div><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
+    </div>
+</div>
+
+<div class="clues">
+    <b>Clues Across</b>
+    <div data-bind="foreach: CluesAcross()">
+        <div><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    var TYPE_PLAIN = 0,
+        TYPE_ACROSS = 1,
+        TYPE_DOWN = 2,
+        TYPE_BOTH = 3, // TYPE_ACROSS & TYPE_DOWN
+        TYPE_BLOCK = -1; //numbering will be ignored
+ 
+    var conn;
+ 
+    $(".board .letter").on('focusout', function(e) {
+        if (!conn) {
+            return false;
+        }
+
+        var val;
+
+        if (e.which ) {
+            val = String.fromCharCode(e.which);
+        } else {
+            val = $(this).val();
+        }
+
+        var index = $(this).attr('name');
+        conn.send(index + ':' + val);
+    }).on('keypress', function() {
+        $(this).parents('td').next().find('.letter').focus();
+    });
+ 
+    if (window["WebSocket"]) {
+        conn = new WebSocket("ws://" + window.location.host + "/ws/" + location.href.split('/').pop());
+        conn.onclose = function(evt) {
+            console.log("Connection closed.");
+        }
+        conn.onmessage = function(evt) {
+            var data = evt.data;
+
+            if (data[0] != '@') {
+                data = [data];
+            } else {
+                data = data.substr(1).split(',');
+            }
+
+            for (var i=0; i < data.length; i++) {
+                var parts = data[i].split(':'),
+                    index = parts[0],
+                    val = parts[1];
+
+                $('.letter[name=' + index + ']').val(val);
+            }
+            console.log(data);
+        }
+    } else {
+        alert("Your browser does not support WebSockets.");
+    }
+
+    function AppModel(puzzle) {
+        var acrossNumbers = []
+            downNumbers = [];
+
+        this.FormatArray = (function() {
+            /**
+            Create an array with values corresponding to the square type
+            **/
+
+            var size = puzzle.Format.length,
+                formatted = new Array(size),
+                width = puzzle.Width;
+
+            //initialize
+            while(size--) formatted[size] = 0;
+
+            for (var ind in puzzle.Format) {
+                var i = +ind,
+                    c = puzzle.Format[i]; //ensure int
+
+                if (c != '#') {
+                    if (i < width ) {
+                        formatted[i] |= TYPE_DOWN;
+                    }
+
+                    if (i % width == 0) {
+                        formatted[i] |= TYPE_ACROSS;
+                    }
+                } else {
+                    formatted[i] = TYPE_BLOCK;
+
+                    if (i + 1 < formatted.length
+                        && puzzle.Format[i+1] != '#') {
+
+                        formatted[i+1] |= TYPE_ACROSS;
+                    }
+
+                    if (i + width < formatted.length
+                        && puzzle.Format[i+width] != '#') {
+                        formatted[i+width] |= TYPE_DOWN;
+                    }
+                }
+            }
+
+            //set the actual clue numbers
+            var counter = 1;
+
+            for (var i in formatted) {
+                if (formatted[i] > 0) {
+                    if (formatted[i] & TYPE_ACROSS) {
+                        acrossNumbers.push(counter);
+                    }
+                    if (formatted[i] & TYPE_DOWN) {
+                        downNumbers.push(counter);
+                    }
+
+                    formatted[i] = counter++;
+                }
+            }
+
+            //put them into rows
+            size = formatted.length / width;
+            var ret = new Array(size),
+                row;
+
+            while (size--) ret[size] = [];
+
+            for (var i in formatted) {
+                row = Math.floor(i / width);
+
+                ret[row].push(formatted[i]);
+            }
+
+            return ret;
+        })();
+
+        this.CluesAcross = function() {
+            var ret = [];
+
+            for (var i in puzzle.CluesAcross) {
+                ret.push({
+                    number: acrossNumbers[i],
+                    clue: puzzle.CluesAcross[i]
+                });
+            }
+
+            return ret;
+        };
+
+        this.CluesDown = function() {
+            var ret = [];
+
+            for (var i in puzzle.CluesDown) {
+                ret.push({
+                    number: downNumbers[i],
+                    clue: puzzle.CluesDown[i]
+                });
+            }
+
+            return ret;
+        };
+    }
+
+    $.getJSON('/api/puzzle', function(data) {
+        ko.applyBindings(new AppModel(data));
+    });
+</script>
+</body>
+</html>

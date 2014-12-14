@@ -29,7 +29,6 @@ func getNum(value string) int {
 
 	if err != nil {
 		log.Fatal(err)
-		log.Print("debug")
 		num = 0
 	}
 
@@ -38,7 +37,7 @@ func getNum(value string) int {
 
 func homeHandler(c http.ResponseWriter, req *http.Request) {
 	//todo read on server load and save in memory
-	dat, err := ioutil.ReadFile(filepath.Join(*assets, "test.html"))
+	dat, err := ioutil.ReadFile(filepath.Join(*assets, "main.html"))
 
 	if err != nil {
 		fmt.Fprintln(c, err)
