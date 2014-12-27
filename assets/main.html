@@ -1,0 +1,38 @@
+<html>
+<head>
+<title>Crossword Collab</title>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/knockout/3.2.0/knockout-debug.js"></script>
+
+<link rel="stylesheet" href="/css/main.css"/>
+</head>
+<body>
+
+<table class="board">
+    <tbody data-bind="foreach: Squares">
+
+        <tr data-bind="foreach: $data">
+            <td data-bind="css: { block: $data.typeFlag == TYPE_BLOCK }, if: $data.typeFlag != TYPE_BLOCK">
+                <input class="letter" maxlength="1" data-bind="css: $data.classes, value: $data.value, hasFocus: $data.focus"/><span class="number" data-bind="visible: $data.typeFlag, text: $data.cornerNumber"></span>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="clues">
+    <b>Clues Down</b>
+    <div data-bind="foreach: CluesDown">
+        <div><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
+    </div>
+</div>
+
+<div class="clues">
+    <b>Clues Across</b>
+    <div data-bind="foreach: CluesAcross">
+        <div><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
+    </div>
+</div>
+
+<script src="/js/main.js" type="text/javascript"></script>
+</body>
+</html>

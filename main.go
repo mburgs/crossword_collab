@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"os"
+	"strings"
 )
 
 var (
@@ -20,7 +22,7 @@ var (
 )
 
 func defaultAssetPath() string {
-	return "../src/bitbucket.org/mburgs/crossword_collab"
+	return os.Getenv("GOPATH") + "/src/crossword_collab/assets"
 }
 
 /** Utils **/
@@ -35,9 +37,16 @@ func getNum(value string) int {
 	return int(num)
 }
 
-func homeHandler(c http.ResponseWriter, req *http.Request) {
+func homeHandler(c http.ResponseWriter, r *http.Request) {
 	//todo read on server load and save in memory
-	dat, err := ioutil.ReadFile(filepath.Join(*assets, "main.html"))
+
+	file := "main.html"
+
+	if strings.HasSuffix(r.URL.Path, "js") || strings.HasSuffix(r.URL.Path, "css") {
+		file = r.URL.Path
+	}
+
+	dat, err := ioutil.ReadFile(filepath.Join(*assets, file))
 
 	if err != nil {
 		fmt.Fprintln(c, err)
