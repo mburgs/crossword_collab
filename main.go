@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"os"
-	"strings"
+	"regexp"
 )
 
 var (
@@ -42,7 +42,9 @@ func homeHandler(c http.ResponseWriter, r *http.Request) {
 
 	file := "main.html"
 
-	if strings.HasSuffix(r.URL.Path, "js") || strings.HasSuffix(r.URL.Path, "css") {
+	match, _ := regexp.MatchString("(js|css|jpg)$", r.URL.Path)
+
+	if match {
 		file = r.URL.Path
 	}
 

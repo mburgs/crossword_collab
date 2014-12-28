@@ -21,7 +21,7 @@
 
 <!-- ko foreach: ['Down', 'Across'] -->
 <div class="clues">
-    <b data-bind="text: 'Clues ' + $data"></b>
+    <b class="header" data-bind="text: 'Clues ' + $data"></b>
     <div data-bind="foreach: $parent.clues[$data]">
         <div data-bind="css: classes, click: clickListener"><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
     </div>

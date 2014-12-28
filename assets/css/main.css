@@ -3,7 +3,7 @@ body {
     margin: 0;
     width: 100%;
     height: 100%;
-    background: gray;
+    background: url(/img/background.jpg);
     font-family: Arial, sans-serif;
 }
 
@@ -46,12 +46,18 @@ body {
 }
 
 .clues {
-    background: white;
+    border: 1px solid #ccc;
     float: left;
     font-size: 14px;
     margin-right: 10px;
-    padding: 10px 5px;
+    padding: 0 5px;
     width: 200px;
+}
+
+.clues .header {
+    display: block;
+    padding: 10px 0 5px;
+    border-bottom: 1px solid;
 }
 
 .clues>div {
