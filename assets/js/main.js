@@ -6,11 +6,19 @@ var TYPE_PLAIN = 0,
 
 var conn, appModel, letterMap = {};
 
-$(document).on('keypress', function(e) {
-    if (e.which == 39) {
+$(document).on('keyup', function(e) {
+    if (e.which == 37) {
         console.log('left');
-    } else if(e.which == 40) {
+        appModel.direction('across');
+    } else if (e.which == 38) {
         console.log('up');
+        appModel.direction('down');
+    } else if (e.which == 39) {
+        console.log('right');
+        appModel.direction('across');
+    } else if(e.which == 40) {
+        console.log('down');
+        appModel.direction('down');
     }
 });
 
@@ -44,161 +52,166 @@ function messageListener(evt) {
     }
 }
 
-function valueListener(value) {
-    if (!this.settingFromMessage) {
-        conn.send(this.letterId + ':' + value);
+function Square(id) {
+    var self = this;
+
+    letterMap[id] = this;
+
+    this.letterId = id;
+    this.typeFlag = 0;
+    this.value = ko.observable('');
+    this.focus = ko.observable(false);
+
+    this.value.subscribe(valueListener.bind(this));
+    this.focus.subscribe(focusListener.bind(this));
+
+    this.classes = ko.pureComputed(function() {
+        if (
+            (appModel.direction() == 'across' && appModel.currentClue() == self.acrossNumber) ||
+            (appModel.direction() == 'down' && appModel.currentClue() == self.downNumber)
+        ) {
+            return 'highlight';
+        }
+    }, appModel);
+
+    function valueListener(value) {
+        if (!this.settingFromMessage) {
+            conn.send(this.letterId + ':' + value);
+        }
+    }
+
+    function focusListener(focused) {
+        if (focused) {
+            var clue = appModel.direction() == 'down' ? this.downNumber : this.acrossNumber;
+        }
+
+        appModel.currentClue(clue);
+    }
+
+
+    this.setValue = function(val) {
+        this.settingFromMessage = true;
+        this.value(val);
+        this.settingFromMessage = false;
     }
 }
 
-function focusListener(focused) {
-    if (focused) {
-        var clue = appModel.direction() == 'down' ? this.downNumber : this.acrossNumber;
-    }
+function Clue(number, clue, direction, startSquare) {
+    var self = this;
+    this.number = number;
+    this.clue = clue;
+    this.direction = direction;
+    this.startSquare = startSquare;
 
-    appModel.currentClue(clue);
+    this.highlight = ko.pureComputed(function() {
+        if (appModel.currentClue() == self.number &&
+            appModel.direction() == self.direction) {
+            return true;
+        }
+    }, appModel);
+
+    this.clickListener = (function(e) {
+        appModel.direction(this.direction);
+        appModel.currentClue(this.number);
+        this.startSquare.focus(true);
+    }).bind(this);
 }
 
 function AppModel(puzzle) {
     this.currentClue = ko.observable(1);
     this.direction = ko.observable('across');
 
-    this.perSide = puzzle.Width;
+    this.clues = {
+        'Across': [],
+        'Down': []
+    };
 
-    var acrossNumbers = [],
-        downNumbers = [];
+    //setup formatting and clues
 
-    function Square(id) {
-        var self = this;
+    var size = puzzle.Format.length,
+        formatted = new Array(size),
+        width = puzzle.Width,
+        clueCounter = 1,
+        currentDown, currentAcross,
+        acrossCounter = downCounter = 0;
 
-        letterMap[id] = this;
+    //initialize
+    while(size--) formatted[size] = new Square(size);
 
-        this.letterId = id;
-        this.typeFlag = 0;
-        this.value = ko.observable('');
-        this.focus = ko.observable(false);
+    for (var ind in puzzle.Format) {
+        var i = +ind,
+            c = puzzle.Format[i]; //ensure int
 
-        this.value.subscribe(valueListener.bind(this));
-        this.focus.subscribe(focusListener.bind(this));
-
-        this.classes = ko.pureComputed(function() {
-            var base = 'a' + self.acrossNumber + ' d' + self.downNumber;
-
-            if (
-                (appModel.direction() == 'across' && appModel.currentClue() == self.acrossNumber) ||
-                (appModel.direction() == 'down' && appModel.currentClue() == self.downNumber)
-            ) {
-                base += ' highlight';
+        if (c != '#') {
+            if (i < width ) {
+                formatted[i].typeFlag |= TYPE_DOWN;
             }
 
-            return base;
-        }, appModel);
-
-        this.setValue = function(val) {
-            this.settingFromMessage = true;
-            this.value(val);
-            this.settingFromMessage = false;
-        }
-    }
-
-    this.Squares = (function() {
-        /**
-        Create an array with values corresponding to the square type
-        **/
-
-        var size = puzzle.Format.length,
-            formatted = new Array(size),
-            width = puzzle.Width,
-            clueCounter = 1,
-            currentDown, currentAcross;
-
-        //initialize
-        while(size--) formatted[size] = new Square(size);
-
-        for (var ind in puzzle.Format) {
-            var i = +ind,
-                c = puzzle.Format[i]; //ensure int
-
-            if (c != '#') {
-                if (i < width ) {
-                    formatted[i].typeFlag |= TYPE_DOWN;
-                }
-
-                if (i % width == 0) {
-                    formatted[i].typeFlag |= TYPE_ACROSS;
-                }
+            if (i % width == 0) {
+                formatted[i].typeFlag |= TYPE_ACROSS;
+            }
 
 
-                //save which numbers are which type
-                if (formatted[i].typeFlag & TYPE_ACROSS) {
-                    acrossNumbers.push(clueCounter);
-                    currentAcross = clueCounter;
-                }
+            //save which numbers are which type
+            if (formatted[i].typeFlag & TYPE_ACROSS) {
+                this.clues.Across.push(new Clue(
+                    clueCounter,
+                    puzzle.CluesAcross[acrossCounter++],
+                    'across',
+                    formatted[i]
+                ));
+                currentAcross = clueCounter;
+            }
 
-                if (formatted[i].typeFlag & TYPE_DOWN) {
-                    downNumbers.push(clueCounter);
-                    currentDown = clueCounter;
-                } else {
-                    //special handling since horizontally adjacent squares dont share numbers
-                    currentDown = formatted[i - width].downNumber;
-                }
-
-                //set which clues this square is a part of
-                //keep this out of the above block for similarity to acrossNumber
-                formatted[i].downNumber = currentDown;
-                formatted[i].acrossNumber = currentAcross;
-
-                //set the numbers to show which clue starts where
-                if (formatted[i].typeFlag != TYPE_PLAIN) {
-                    formatted[i].cornerNumber = clueCounter++;
-                }
+            if (formatted[i].typeFlag & TYPE_DOWN) {
+                this.clues.Down.push(new Clue(
+                    clueCounter,
+                    puzzle.CluesDown[downCounter++],
+                    'down',
+                    formatted[i]
+                ));
+                currentDown = clueCounter;
             } else {
-                formatted[i].typeFlag = TYPE_BLOCK;
+                //special handling since horizontally adjacent squares dont share numbers
+                currentDown = formatted[i - width].downNumber;
+            }
 
-                if (i + 1 < formatted.length
-                    && puzzle.Format[i+1] != '#') {
+            //set which clues this square is a part of
+            //keep this out of the above block for similarity to acrossNumber
+            formatted[i].downNumber = currentDown;
+            formatted[i].acrossNumber = currentAcross;
 
-                    formatted[i+1].typeFlag |= TYPE_ACROSS;
-                }
+            //set the numbers to show which clue starts where
+            if (formatted[i].typeFlag != TYPE_PLAIN) {
+                formatted[i].cornerNumber = clueCounter++;
+            }
+        } else {
+            formatted[i].typeFlag = TYPE_BLOCK;
 
-                if (i + width < formatted.length
-                    && puzzle.Format[i+width] != '#') {
-                    formatted[i+width].typeFlag |= TYPE_DOWN;
-                }
+            if (i + 1 < formatted.length
+                && puzzle.Format[i+1] != '#') {
+
+                formatted[i+1].typeFlag |= TYPE_ACROSS;
+            }
+
+            if (i + width < formatted.length
+                && puzzle.Format[i+width] != '#') {
+                formatted[i+width].typeFlag |= TYPE_DOWN;
             }
         }
-
-        //put them into rows
-        size = formatted.length / width;
-        var ret = new Array(size),
-            row;
-
-        while (size--) ret[size] = [];
-
-        for (var i in formatted) {
-            row = Math.floor(i / width);
-
-            ret[row].push(formatted[i]);
-        }
-
-        return ret;
-    })();
-
-    this.CluesAcross = [];
-
-    for (var i in puzzle.CluesAcross) {
-        this.CluesAcross.push({
-            number: acrossNumbers[i],
-            clue: puzzle.CluesAcross[i]
-        });
     }
 
-    this.CluesDown = [];
+    //put them into rows
+    size = formatted.length / width;
+    this.Squares = new Array(size);
+    var row;
 
-    for (var i in puzzle.CluesDown) {
-        this.CluesDown.push({
-            number: downNumbers[i],
-            clue: puzzle.CluesDown[i]
-        });
+    while (size--) this.Squares[size] = [];
+
+    for (var i in formatted) {
+        row = Math.floor(i / width);
+
+        this.Squares[row].push(formatted[i]);
     }
 
     setupWebsocket();

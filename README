@@ -1,3 +1,3 @@
 ## Crossword Collab
 
-Demo of using websockets and multithreading to build a collaborative crossword game in Go
+Demo of using websockets and multithreading to build a collaborative crossword game using Go and KnockoutJS
