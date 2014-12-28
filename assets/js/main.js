@@ -4,21 +4,27 @@ var TYPE_PLAIN = 0,
     TYPE_BOTH = 3, // TYPE_ACROSS & TYPE_DOWN
     TYPE_BLOCK = -1; //numbering will be ignored
 
-var conn, appModel, letterMap = {};
+var conn, appModel;
 
-$(document).on('keyup', function(e) {
-    if (e.which == 37) {
-        console.log('left');
-        appModel.direction('across');
-    } else if (e.which == 38) {
-        console.log('up');
-        appModel.direction('down');
-    } else if (e.which == 39) {
-        console.log('right');
-        appModel.direction('across');
-    } else if(e.which == 40) {
-        console.log('down');
-        appModel.direction('down');
+ko.bindingHandlers.selectOnFocus = {
+    'init': function(element) {
+        $(element).on('focus', function() {
+            $(this).select();
+        });
+    }
+};
+
+$(document).on('keydown', function(e) {
+    if (e.which >=37 && e.which <= 40) {
+        appModel.direction(e.which % 2 ? 'across' : 'down');
+        appModel[(e.which <= 38 ? 'prev' : 'next')  +'Letter']();
+
+        e.preventDefault();
+    } else if (e.which == 32) {
+        //sapcebar
+        appModel.direction(appModel.direction() == 'across' ? 'down' : 'across');
+        e.preventDefault();
+        return false;
     }
 });
 
@@ -48,14 +54,12 @@ function messageListener(evt) {
             index = parts[0],
             val = parts[1];
 
-        letterMap[index].setValue(val);
+        appModel.squareMap[index].setValue(val);
     }
 }
 
 function Square(id) {
     var self = this;
-
-    letterMap[id] = this;
 
     this.letterId = id;
     this.typeFlag = 0;
@@ -77,15 +81,19 @@ function Square(id) {
     function valueListener(value) {
         if (!this.settingFromMessage) {
             conn.send(this.letterId + ':' + value);
+
+            if (value) {
+                appModel.nextLetter();
+            }
         }
     }
 
     function focusListener(focused) {
         if (focused) {
             var clue = appModel.direction() == 'down' ? this.downNumber : this.acrossNumber;
-        }
 
-        appModel.currentClue(clue);
+            appModel.currentSquare(this);
+        }
     }
 
 
@@ -96,6 +104,14 @@ function Square(id) {
     }
 }
 
+Square.prototype.partOf = function(clue) {
+    if (clue.direction == 'across') {
+        return clue.number == this.acrossNumber;
+    } else {
+        return clue.number == this.downNumber;
+    }
+};
+
 function Clue(number, clue, direction, startSquare) {
     var self = this;
     this.number = number;
@@ -103,23 +119,41 @@ function Clue(number, clue, direction, startSquare) {
     this.direction = direction;
     this.startSquare = startSquare;
 
-    this.highlight = ko.pureComputed(function() {
-        if (appModel.currentClue() == self.number &&
-            appModel.direction() == self.direction) {
-            return true;
+    this.classes = ko.pureComputed(function() {
+        if (
+            appModel.currentClue() == self.number &&
+            appModel.direction() == self.direction
+            ) {
+            return 'current highlight';
+        } else if (appModel.currentSquare() && 
+            appModel.currentSquare().partOf(self)) {
+            return 'highlight';
         }
     }, appModel);
 
     this.clickListener = (function(e) {
         appModel.direction(this.direction);
-        appModel.currentClue(this.number);
         this.startSquare.focus(true);
     }).bind(this);
 }
 
 function AppModel(puzzle) {
-    this.currentClue = ko.observable(1);
+    this.currentClue = ko.pureComputed(function() {
+        if (!this.currentSquare()) {
+            return;
+        }
+
+        if (this.direction() == 'across') {
+            return this.currentSquare().acrossNumber;
+        } else {
+            return this.currentSquare().downNumber;
+        }
+    }, this);
+
     this.direction = ko.observable('across');
+    this.currentSquare = ko.observable(null);
+
+    this.perSide = puzzle.Width;
 
     this.clues = {
         'Across': [],
@@ -129,14 +163,14 @@ function AppModel(puzzle) {
     //setup formatting and clues
 
     var size = puzzle.Format.length,
-        formatted = new Array(size),
         width = puzzle.Width,
         clueCounter = 1,
         currentDown, currentAcross,
         acrossCounter = downCounter = 0;
 
-    //initialize
-    while(size--) formatted[size] = new Square(size);
+    this.squareMap = new Array(size)
+
+    while(size--) this.squareMap[size] = new Square(size);
 
     for (var ind in puzzle.Format) {
         var i = +ind,
@@ -144,79 +178,127 @@ function AppModel(puzzle) {
 
         if (c != '#') {
             if (i < width ) {
-                formatted[i].typeFlag |= TYPE_DOWN;
+                this.squareMap[i].typeFlag |= TYPE_DOWN;
             }
 
             if (i % width == 0) {
-                formatted[i].typeFlag |= TYPE_ACROSS;
+                this.squareMap[i].typeFlag |= TYPE_ACROSS;
             }
 
 
             //save which numbers are which type
-            if (formatted[i].typeFlag & TYPE_ACROSS) {
+            if (this.squareMap[i].typeFlag & TYPE_ACROSS) {
                 this.clues.Across.push(new Clue(
                     clueCounter,
                     puzzle.CluesAcross[acrossCounter++],
                     'across',
-                    formatted[i]
+                    this.squareMap[i]
                 ));
                 currentAcross = clueCounter;
             }
 
-            if (formatted[i].typeFlag & TYPE_DOWN) {
+            if (this.squareMap[i].typeFlag & TYPE_DOWN) {
                 this.clues.Down.push(new Clue(
                     clueCounter,
                     puzzle.CluesDown[downCounter++],
                     'down',
-                    formatted[i]
+                    this.squareMap[i]
                 ));
                 currentDown = clueCounter;
             } else {
                 //special handling since horizontally adjacent squares dont share numbers
-                currentDown = formatted[i - width].downNumber;
+                currentDown = this.squareMap[i - width].downNumber;
             }
 
             //set which clues this square is a part of
             //keep this out of the above block for similarity to acrossNumber
-            formatted[i].downNumber = currentDown;
-            formatted[i].acrossNumber = currentAcross;
+            this.squareMap[i].downNumber = currentDown;
+            this.squareMap[i].acrossNumber = currentAcross;
 
             //set the numbers to show which clue starts where
-            if (formatted[i].typeFlag != TYPE_PLAIN) {
-                formatted[i].cornerNumber = clueCounter++;
+            if (this.squareMap[i].typeFlag != TYPE_PLAIN) {
+                this.squareMap[i].cornerNumber = clueCounter++;
             }
         } else {
-            formatted[i].typeFlag = TYPE_BLOCK;
+            this.squareMap[i].typeFlag = TYPE_BLOCK;
 
-            if (i + 1 < formatted.length
+            if (i + 1 < this.squareMap.length
                 && puzzle.Format[i+1] != '#') {
 
-                formatted[i+1].typeFlag |= TYPE_ACROSS;
+                this.squareMap[i+1].typeFlag |= TYPE_ACROSS;
             }
 
-            if (i + width < formatted.length
+            if (i + width < this.squareMap.length
                 && puzzle.Format[i+width] != '#') {
-                formatted[i+width].typeFlag |= TYPE_DOWN;
+                this.squareMap[i+width].typeFlag |= TYPE_DOWN;
             }
         }
     }
 
     //put them into rows
-    size = formatted.length / width;
+    size = this.squareMap.length / width;
     this.Squares = new Array(size);
     var row;
 
     while (size--) this.Squares[size] = [];
 
-    for (var i in formatted) {
+    for (var i in this.squareMap) {
         row = Math.floor(i / width);
 
-        this.Squares[row].push(formatted[i]);
+        this.Squares[row].push(this.squareMap[i]);
     }
 
     setupWebsocket();
 
     return this;
+};
+
+AppModel.prototype.nextLetter = function() {
+    this.focusLetter(1);
+};
+
+AppModel.prototype.prevLetter = function() {
+    this.focusLetter(-1);
+};
+
+AppModel.prototype.focusLetter = function(dir) {
+    var next = this.getLetter(dir);
+
+    while(next && next.typeFlag == TYPE_BLOCK) {
+        next = this.getLetter(dir, next)
+    }
+
+    if (next) {
+        next.focus(true);
+    }
+};
+
+/**
+Gets letter in sequence. Dir is either 1 (forward) or -1 (backward)
+This function takes into account the current direction
+**/
+AppModel.prototype.getLetter = function(dir, base) {
+    if (this.direction() == 'across') {
+        return this.getOffsetSquare(1 * dir, base);
+    } else {
+        return this.getOffsetSquare(this.perSide * dir, base);
+    }
+}
+
+/**
+Facility for getting squares given an offset. Returns null for an
+undefined square (out of bounds)
+**/
+AppModel.prototype.getOffsetSquare = function(offset, base) {
+    if (!base) {
+        base = this.currentSquare();
+    }
+    try {
+        return this.squareMap[base.letterId + offset];
+    } catch (e) {
+        console.log(e);
+        return null;
+    }
 };
 
 $.getJSON('/api/puzzle', function(data) {

@@ -16,8 +16,6 @@ body {
     border: none;
     margin: 0;
     padding: 0;
-    width: 40px;
-    height: 40px;
     position: relative;
 }
 .board .letter {
@@ -27,6 +25,7 @@ body {
     text-align: center;
     font-family: monospace;
     border: 1px solid black;
+    text-transform: uppercase;
 }
 .board .letter:focus {
     border-color: blue;
@@ -65,5 +64,9 @@ body {
 }
 
 .clues .highlight {
-    background-color: #ccc;
+    background-color: #ddd;
+    font-weight: bold;
+}
+.clues .current {
+    background-color: #aae;
 }

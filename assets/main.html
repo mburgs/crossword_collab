@@ -12,8 +12,8 @@
     <tbody data-bind="foreach: Squares">
 
         <tr data-bind="foreach: $data">
-            <td data-bind="css: { block: $data.typeFlag == TYPE_BLOCK }, if: $data.typeFlag != TYPE_BLOCK">
-                <input class="letter" maxlength="1" data-bind="css: $data.classes, value: $data.value, hasFocus: $data.focus"/><span class="number" data-bind="visible: $data.typeFlag, text: $data.cornerNumber"></span>
+            <td data-bind="css: { block: typeFlag == TYPE_BLOCK }, if: typeFlag != TYPE_BLOCK">
+                <input class="letter" maxlength="1" data-bind="css: classes, textInput: value, hasFocus: focus, selectOnFocus: true"/><span class="number" data-bind="visible: typeFlag, text: $data.cornerNumber"></span>
             </td>
         </tr>
     </tbody>
@@ -23,7 +23,7 @@
 <div class="clues">
     <b data-bind="text: 'Clues ' + $data"></b>
     <div data-bind="foreach: $parent.clues[$data]">
-        <div data-bind="css: {highlight: highlight()}, click: clickListener"><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
+        <div data-bind="css: classes, click: clickListener"><b data-bind="text: number + '. '"></b><span data-bind="text: clue"></span></div>
     </div>
 </div>
 <!-- /ko -->
