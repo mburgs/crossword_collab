@@ -59,8 +59,6 @@ function messageListener(evt) {
 }
 
 function Square(id) {
-    var self = this;
-
     this.letterId = id;
     this.typeFlag = 0;
     this.value = ko.observable('');
@@ -69,14 +67,23 @@ function Square(id) {
     this.value.subscribe(valueListener.bind(this));
     this.focus.subscribe(focusListener.bind(this));
 
-    this.classes = ko.pureComputed(function() {
+    this.classes = ko.pureComputed(computeClasses.bind(this));
+
+    function computeClasses() {
+        var classes = [
+            'a' + this.acrossNumber,
+            'd' + this.downNumber
+        ];
+
         if (
-            (appModel.direction() == 'across' && appModel.currentClue() == self.acrossNumber) ||
-            (appModel.direction() == 'down' && appModel.currentClue() == self.downNumber)
-        ) {
-            return 'highlight';
+            (appModel.direction() == 'across' && appModel.currentClue() == this.acrossNumber) ||
+            (appModel.direction() == 'down' && appModel.currentClue() == this.downNumber)
+            ) {
+            classes.push('highlight');
         }
-    }, appModel);
+
+        return classes.join(' ');
+    }
 
     function valueListener(value) {
         if (!this.settingFromMessage) {
@@ -113,29 +120,45 @@ Square.prototype.partOf = function(clue) {
 };
 
 function Clue(number, clue, direction, startSquare) {
-    var self = this;
     this.number = number;
     this.clue = clue;
     this.direction = direction;
     this.startSquare = startSquare;
 
-    this.classes = ko.pureComputed(function() {
-        if (
-            appModel.currentClue() == self.number &&
-            appModel.direction() == self.direction
-            ) {
-            return 'current highlight';
-        } else if (appModel.currentSquare() && 
-            appModel.currentSquare().partOf(self)) {
-            return 'highlight';
+    this.classes = ko.pureComputed(computeClasses.bind(this));
+
+    function computeClasses() {
+
+        var classes = [];
+
+        if (this.completed()) {
+            classes.push('completed');
         }
-    }, appModel);
+
+        if (
+            appModel.currentClue() == this.number &&
+            appModel.direction() == this.direction
+            ) {
+            classes.push('current');
+        } 
+
+        if (appModel.currentSquare() && 
+            appModel.currentSquare().partOf(this)) {
+            classes.push('highlight');
+        }
+
+        return classes.join(' ');
+    }
 
     this.clickListener = (function(e) {
         appModel.direction(this.direction);
         this.startSquare.focus(true);
     }).bind(this);
 }
+
+Clue.prototype.completed = function() {
+    return ! $('.' + this.direction.substr(0,1) + this.number).filter(function() {return !this.value}).length;
+};
 
 function AppModel(puzzle) {
     this.currentClue = ko.pureComputed(function() {
